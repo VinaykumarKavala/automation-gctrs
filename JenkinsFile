@@ -1,22 +1,36 @@
 pipeline {
   agent any
+
+  // Pick the JDK tool by name (from Global Tool Configuration)
+  tools {
+    jdk 'jdk17'     // <-- must match the name you configured
+  }
+
+  // Make JAVA_HOME explicit and prepend to PATH for Windows
+  environment {
+    JAVA_HOME = "${tool 'jdk17'}"
+    PATH = "${env.JAVA_HOME}\\bin;${env.PATH}"
+    GRADLE_USER_HOME = "${WORKSPACE}\\.gradle"
+  }
+
   options {
     timestamps()
     disableConcurrentBuilds()
     buildDiscarder(logRotator(numToKeepStr: '20'))
   }
+
   parameters {
     choice(name: 'ENV', choices: ['dev', 'uat', 'ppd'], description: 'Target environment')
   }
-  environment {
-    GRADLE_USER_HOME = "${WORKSPACE}\\.gradle"
-    JAVA_HOME="${JAVA_HOME}"
-  }
+
   stages {
     stage('Prep') {
       steps {
         deleteDir()
         checkout scm
+        // sanity: verify Java is visible to this build user
+        bat 'echo JAVA_HOME=%JAVA_HOME%'
+        bat 'where java'
         bat 'gradlew.bat --version'
       }
     }
@@ -32,5 +46,8 @@ pipeline {
       }
     }
   }
-  post { always { echo "Done: apiTest on ${params.ENV}" } }
+
+  post {
+    always { echo "Done: apiTest on ${params.ENV}" }
+  }
 }
