@@ -1,0 +1,8 @@
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd" >
+<suite name="Cucumber API" verbose="1">
+    <test name="Cukes API">
+        <classes>
+            <class name="com.example.framework.cucumber.runner.RunApiCukesParallel"/>
+        </classes>
+    </test>
+</suite>

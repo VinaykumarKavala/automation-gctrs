@@ -1,0 +1,123 @@
+# ======================================================
+# Java / Gradle Automation Framework .gitignore
+# ======================================================
+
+### Build and Output ###
+/build/
+/out/
+/target/
+/bin/
+/reports/
+/results/
+/logs/
+/allure-results/
+/allure-report/
+/test-output/
+/test-reports/
+/cucumber-reports/
+/surefire-reports/
+/emailable-report.html
+*.log
+*.tmp
+*.swp
+*.bak
+
+### Gradle ###
+.gradle/
+!.gradle/wrapper/gradle-wrapper.properties
+!gradle/wrapper/gradle-wrapper.jar
+.gradle-cache/
+.gradle-test-kit/
+*.gradletasknamecache
+gradle-app.setting
+.gradle-local.properties
+
+### WebDriverManager / Drivers ###
+drivers/
+webdrivers/
+selenium-drivers/
+chromedriver*
+geckodriver*
+msedgedriver*
+IEDriverServer*
+*.exe
+
+### Local Configuration & Secrets ###
+src/test/resources/config/application-local.properties
+src/test/resources/config/application-secrets.properties
+*.env
+.env.*
+.envrc
+*.keystore
+*.pem
+*.p12
+*.crt
+*.cer
+
+### IntelliJ IDEA ###
+.idea/
+*.iml
+*.iws
+*.ipr
+*.class
+*.jar
+*.war
+*.ear
+
+### Eclipse / VSCode ###
+.project
+.classpath
+.settings/
+.vscode/
+
+### OS / Misc ###
+.DS_Store
+Thumbs.db
+desktop.ini
+*.orig
+*.rej
+*.cache
+*.pid
+*.seed
+*.bak
+*.tmp
+*.swp
+*.lock
+
+### Logs ###
+*.log
+build/logs/
+build/test-results/
+build/reports/
+*.json
+
+!src/test/resources/**/*.xml  # keep intentional XML configs
+
+### Temporary Files ###
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+### Environment specific / custom caches ###
+.env/
+.cache/
+.local/
+node_modules/
+dist/
+coverage/
+
+### Jenkins / CI ###
+*.jenkinsfile.backup
+*.jenkinsfile.old
+*.jenkinsfile.local
+pipeline-logs/
+workspace-temp/
+
+### OS-specific ###
+ehthumbs.db
+Icon?
+$RECYCLE.BIN/

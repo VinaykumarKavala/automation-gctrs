@@ -1,0 +1,11 @@
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd" >
+<suite name="API Suite" verbose="1" >
+    <listeners>
+        <listener class-name="com.example.framework.listeners.TestListener"/>
+    </listeners>
+    <test name="ReqRes + HttpBin">
+        <classes>
+            <class name="com.example.framework.api.tests.ReqResHttpbinTests"/>
+        </classes>
+    </test>
+</suite>

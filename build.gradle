@@ -1,0 +1,79 @@
+plugins { id 'java' }
+
+group = 'com.example'
+version = '1.0-SNAPSHOT'
+
+java { toolchain { languageVersion = JavaLanguageVersion.of(17) } }
+repositories { mavenCentral() }
+
+dependencies {
+    // Test runner + assertions
+    testImplementation 'org.testng:testng:7.10.2'
+    testImplementation 'org.hamcrest:hamcrest:2.2'
+
+    // Rest Assured + JSON
+    testImplementation 'io.rest-assured:rest-assured:5.5.0'
+    testImplementation 'io.rest-assured:json-path:5.5.0'
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.18.1'
+
+    // Selenium + drivers
+    testImplementation 'org.seleniumhq.selenium:selenium-java:4.25.0'
+    testImplementation 'io.github.bonigarcia:webdrivermanager:5.9.2'
+
+    // Logging
+    testImplementation 'org.apache.logging.log4j:log4j-api:2.24.1'
+    testImplementation 'org.apache.logging.log4j:log4j-core:2.24.1'
+
+    // Cucumber + TestNG
+    testImplementation 'io.cucumber:cucumber-java:7.18.1'
+    testImplementation 'io.cucumber:cucumber-testng:7.18.1'
+}
+
+test {
+    useTestNG() {
+        def suite = System.getProperty("suite", "testng-mixed.xml")
+        suites file(suite)
+
+        def par = System.getProperty("par.mode", "none")
+        if (par != "none") {
+            parallel par
+            threadCount = Integer.parseInt(System.getProperty("par.threads", "4"))
+            dataProviderThreadCount = Integer.parseInt(System.getProperty("par.dpThreads", "4"))
+        }
+        useDefaultListeners = true
+    }
+    // Expose keys (others picked by Config via sys/env)
+    systemProperty "env", System.getProperty("env", "dev")
+    systemProperty "cucumber.filter.tags", System.getProperty("cucumber.filter.tags", "")
+
+    // Gradle JVM forks
+    maxParallelForks = Integer.parseInt(System.getProperty("par.forks", "1"))
+    forkEvery = Long.parseLong(System.getProperty("par.forkEvery", "0"))
+
+    reports.junitXml.required = true
+}
+
+// Dedicated tasks bound to suites
+tasks.register('apiTest', Test) {
+    useTestNG() { suites file("testng-api.xml") }
+    systemProperties System.getProperties()
+    maxParallelForks = Integer.parseInt(System.getProperty("par.forks","1"))
+}
+
+tasks.register('uiTest', Test) {
+    useTestNG() { suites file("testng-ui.xml") }
+    systemProperties System.getProperties()
+    maxParallelForks = Integer.parseInt(System.getProperty("par.forks","1"))
+}
+
+tasks.register('cukeApi', Test) {
+    useTestNG() { suites file("testng-cucumber-api.xml") }
+    systemProperties System.getProperties()
+    maxParallelForks = Integer.parseInt(System.getProperty("par.forks","1"))
+}
+
+tasks.register('cukeUi', Test) {
+    useTestNG() { suites file("testng-cucumber-ui.xml") }
+    systemProperties System.getProperties()
+    maxParallelForks = Integer.parseInt(System.getProperty("par.forks","1"))
+}
