@@ -37,15 +37,18 @@ gradle-app.setting
 !gradlew.bat
 
 
-### WebDriverManager / Drivers ###
-drivers/
-webdrivers/
-selenium-drivers/
+# ---- WebDriver binaries at repo root only (ok to keep cached tools outside src/) ----
+/drivers/
+/webdrivers/
+/selenium-drivers/
 chromedriver*
 geckodriver*
 msedgedriver*
 IEDriverServer*
 *.exe
+
+# DO NOT ignore Java source packages named 'drivers'
+!/src/**/drivers/**
 
 ### Local Configuration & Secrets ###
 src/test/resources/config/application-local.properties
