@@ -31,6 +31,11 @@
 *.gradletasknamecache
 gradle-app.setting
 .gradle-local.properties
+!gradle/wrapper/gradle-wrapper.properties
+!gradle/wrapper/gradle-wrapper.jar
+!gradlew
+!gradlew.bat
+
 
 ### WebDriverManager / Drivers ###
 drivers/
