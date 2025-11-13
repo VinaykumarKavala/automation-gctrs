@@ -90,7 +90,7 @@ build/logs/
 build/test-results/
 build/reports/
 *.json
-
+*.xml
 !src/test/resources/**/*.xml  # keep intentional XML configs
 
 ### Temporary Files ###

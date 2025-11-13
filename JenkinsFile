@@ -1,17 +1,19 @@
+// Cross-platform runner helper: uses sh on Linux/macOS, bat on Windows
+def run(cmd) { isUnix() ? sh(cmd) : bat(cmd) }
+
 pipeline {
   agent any
 
   options {
     timestamps()
-    ansiColor('xterm')
+    // Use the AnsiColor *wrapper* (requires AnsiColor plugin). Or delete this line if you prefer no colors.
+    wrap([$class: 'AnsiColorBuildWrapper', colorMapName: 'xterm'])
     disableConcurrentBuilds()
-    // keep CI lean
     buildDiscarder(logRotator(numToKeepStr: '30', artifactNumToKeepStr: '30'))
     timeout(time: 90, unit: 'MINUTES')
   }
 
   parameters {
-    // Limit the matrix at runtime (comma-separated lists). Leave blank = run all axis values.
     string(name: 'RUN_ENVS',      defaultValue: '',    description: 'Subset of envs to run (dev,uat,ppd). Empty = all')
     string(name: 'RUN_TASKS',     defaultValue: '',    description: 'Subset of tasks (apiTest,uiTest,cukeApi,cukeUi,test)')
     string(name: 'RUN_BROWSERS',  defaultValue: '',    description: 'Subset of browsers (chrome,firefox,edge,"chrome,firefox"). UI-only')
@@ -19,33 +21,36 @@ pipeline {
     string(name: 'RUN_PAR_MODE',  defaultValue: '',    description: 'Subset of par modes (none,methods,classes,tests)')
     string(name: 'RUN_THREADS',   defaultValue: '',    description: 'Subset of thread counts (2,4,6,8)')
     string(name: 'RUN_FORKS',     defaultValue: '',    description: 'Subset of forks (1,2)')
+    string(name: 'CUKE_TAGS',     defaultValue: '',    description: 'Cucumber tag expression, e.g. @smoke and not @wip')
     booleanParam(name: 'CLEAN_WORKSPACE', defaultValue: true, description: 'Wipe workspace before build')
-    string(name: 'AGENT_LABEL', defaultValue: '', description: 'Optional agent label to tie this job to (blank = any)')
+    string(name: 'AGENT_LABEL', defaultValue: '', description: 'Optional node label. Leave blank to use any agent')
   }
 
   environment {
-    // Gradle cache across builds (works on most Jenkins setups)
+    // Gradle cache inside workspace
     GRADLE_USER_HOME = "${WORKSPACE}/.gradle"
   }
 
   stages {
 
     stage('Prep') {
-      agent { label params.AGENT_LABEL?.trim() ? params.AGENT_LABEL : '' }
       steps {
         script {
           if (params.CLEAN_WORKSPACE) { deleteDir() }
         }
         checkout scm
-        sh 'chmod +x ./gradlew || true'
-        // Warm the wrapper & cache
-        sh './gradlew --version'
+        // No chmod on Windows; harmless on Linux
+        script { if (isUnix()) sh 'chmod +x ./gradlew || true' }
+        // Warm wrapper & cache
+        script {
+          if (isUnix()) run './gradlew --version'
+          else          run 'gradlew.bat --version'
+        }
       }
     }
 
     stage('Test Matrix') {
       matrix {
-        // ---- AXES (expand or trim as needed) ----
         axes {
           axis {
             name 'AX_ENV'
@@ -53,12 +58,10 @@ pipeline {
           }
           axis {
             name 'AX_TASK'
-            // test = mixed suite (testng-mixed.xml). Others are dedicated gradle tasks we created.
             values 'apiTest', 'uiTest', 'cukeApi', 'cukeUi', 'test'
           }
           axis {
             name 'AX_BROWSER'
-            // Include a combined option "chrome,firefox" to demo cross-browser DP tests
             values 'chrome', 'firefox', 'edge', 'chrome,firefox'
           }
           axis {
@@ -79,8 +82,7 @@ pipeline {
           }
         }
 
-        // ---- FILTER MATRIX AT RUNTIME BASED ON PARAMETERS ----
-        // Skip rows not requested by the *RUN_* filters (if filters are blank => accept all)
+        // Filter matrix at runtime
         when {
           allOf {
             expression { acceptAxis(params.RUN_ENVS,     AX_ENV) }
@@ -93,50 +95,42 @@ pipeline {
           }
         }
 
-        // ---- EXCLUDE WASTEFUL COMBOS (e.g., API tasks don’t need browsers/headless) ----
-        // You can also do this with 'when' in steps; here are hard excludes:
+        // Correct Declarative excludes syntax
         excludes {
-          // For API-only tasks, skip extra browser combos to reduce noise
           exclude {
-            axisValues 'AX_TASK=apiTest', 'AX_BROWSER=chrome,firefox'
+            axis { name 'AX_TASK';    value 'apiTest' }
+            axis { name 'AX_BROWSER'; value 'chrome,firefox' }
           }
           exclude {
-            axisValues 'AX_TASK=cukeApi', 'AX_BROWSER=chrome,firefox'
+            axis { name 'AX_TASK';    value 'cukeApi' }
+            axis { name 'AX_BROWSER'; value 'chrome,firefox' }
           }
         }
 
-        // ---- PER-CELL EXECUTION ----
-        agent { label params.AGENT_LABEL?.trim() ? params.AGENT_LABEL : '' }
-
+        // Run each cell
         stages {
           stage('Run') {
             steps {
               script {
-                // Compute flags from axes
-                def envName   = AX_ENV
-                def taskName  = AX_TASK           // apiTest | uiTest | cukeApi | cukeUi | test
-                def browser   = AX_BROWSER        // may be "chrome,firefox"
-                def headless  = AX_HEADLESS
-                def parMode   = AX_PAR_MODE
-                def threads   = AX_THREADS
-                def forks     = AX_FORKS
+                def envName  = AX_ENV
+                def taskName = AX_TASK
+                def browser  = AX_BROWSER
+                def headless = AX_HEADLESS
+                def parMode  = AX_PAR_MODE
+                def threads  = AX_THREADS
+                def forks    = AX_FORKS
 
-                // Suite for mixed runner
-                def suite = (taskName == 'test') ? '-Dsuite=testng-mixed.xml' : ''
-
-                // UI-only flags (safe to pass for API tasks; they’ll be ignored by code)
+                def suite   = (taskName == 'test') ? '-Dsuite=testng-mixed.xml' : ''
                 def uiFlags = "-Dsel.browsers=${browser} -Dsel.headless=${headless}"
+                def parFlags= "-Dpar.mode=${parMode} -Dpar.threads=${threads} -Dpar.forks=${forks}"
+                def cukes   = params.CUKE_TAGS?.trim() ? "-Dcucumber.filter.tags='${params.CUKE_TAGS}'" : ""
 
-                // Parallel knobs (apply to all; code ignores if mode=none)
-                def parFlags = "-Dpar.mode=${parMode} -Dpar.threads=${threads} -Dpar.forks=${forks}"
+                def cmd = isUnix()
+                  ? "./gradlew ${taskName} -Denv=${envName} ${suite} ${uiFlags} ${parFlags} ${cukes} --no-daemon --stacktrace"
+                  : "gradlew.bat ${taskName} -Denv=${envName} ${suite} ${uiFlags} ${parFlags} ${cukes} --no-daemon --stacktrace"
 
-                // Cucumber tags can be supplied at job-time by setting env var or extending params; default empty.
-                def cukes = params.containsKey('CUKE_TAGS') ? "-Dcucumber.filter.tags='${params.CUKE_TAGS}'" : ""
-
-                // Final command
-                def cmd = "./gradlew ${taskName} -Denv=${envName} ${suite} ${uiFlags} ${parFlags} ${cukes} --no-daemon --stacktrace"
                 echo "Executing: ${cmd}"
-                sh cmd
+                run cmd
               }
             }
           }
@@ -144,9 +138,7 @@ pipeline {
 
         post {
           always {
-            // JUnit (TestNG + Cucumber JUnit export)
             junit allowEmptyResults: true, testResults: 'build/test-results/**/*.xml'
-            // Keep human-friendly HTML reports if present
             archiveArtifacts allowEmptyArchive: true, artifacts: """
               build/reports/tests/**,
               build/reports/cuke-*/**,
@@ -174,7 +166,6 @@ boolean acceptAxis(String filter, String value) {
   if (filter == null) return true
   def f = filter.trim()
   if (f.isEmpty()) return true
-  // Split by comma/space and normalize
   def set = f.split(/[,\s]+/).collect { it.trim().toLowerCase() }.toSet()
   return set.contains(value.toLowerCase())
 }
