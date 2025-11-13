@@ -1,46 +1,26 @@
 pipeline {
   agent any
-
   options {
     timestamps()
     disableConcurrentBuilds()
     buildDiscarder(logRotator(numToKeepStr: '20'))
   }
-
   parameters {
-    // We keep all the knobs for future growth, but we won't use them yet.
     choice(name: 'ENV', choices: ['dev', 'uat', 'ppd'], description: 'Target environment')
-    string(name: 'PAR_MODE',   defaultValue: 'none', description: 'none|tests|classes|methods')
-    string(name: 'THREADS',    defaultValue: '4',    description: 'TestNG threads')
-    string(name: 'FORKS',      defaultValue: '1',    description: 'Gradle forks')
-    string(name: 'BROWSERS',   defaultValue: 'chrome', description: 'Comma-separated browsers')
-    booleanParam(name: 'HEADLESS', defaultValue: false, description: 'Headless mode for UI')
-    string(name: 'CUKE_TAGS',  defaultValue: '',     description: 'Cucumber tag expression')
-    string(name: 'SUITE',      defaultValue: 'testng-api.xml', description: 'Optional suite (unused for apiTest)')
-    string(name: 'AGENT_LABEL', defaultValue: '',    description: 'Optional agent label (blank = any)')
-    booleanParam(name: 'CLEAN_WORKSPACE', defaultValue: true, description: 'Wipe workspace first')
   }
-
   environment {
-    // Cache Gradle between runs on the Windows node
     GRADLE_USER_HOME = "${WORKSPACE}\\.gradle"
   }
-
   stages {
     stage('Prep') {
       steps {
-        script {
-          if (params.CLEAN_WORKSPACE) { deleteDir() }
-        }
+        deleteDir()
         checkout scm
-        // Warm wrapper & cache (Windows uses gradlew.bat)
         bat 'gradlew.bat --version'
       }
     }
-
-    stage('API Tests (default only)') {
+    stage('API Tests') {
       steps {
-        // Minimal run: API tests only, no parallel flags, using selected ENV
         bat "gradlew.bat apiTest -Denv=${params.ENV} --no-daemon --stacktrace"
       }
       post {
@@ -51,10 +31,5 @@ pipeline {
       }
     }
   }
-
-  post {
-    always {
-      echo "Done. (Minimal pipeline ran: apiTest with ENV='${params.ENV}')"
-    }
-  }
+  post { always { echo "Done: apiTest on ${params.ENV}" } }
 }
